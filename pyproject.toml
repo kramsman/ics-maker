@@ -1,0 +1,30 @@
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# The ics_maker package lives in the repo root, not under src/.
+module-root = "."
+module-name = "ics_maker"
+
+[project]
+name = "ics-maker-root"
+version = "0.1.0"
+description = "Turn a spreadsheet of events into one .ics calendar file per row"
+requires-python = ">=3.13"
+dependencies = [
+    "icalendar>=7.0",
+    "openpyxl>=3.1",
+    "uvbekutils",
+]
+
+[project.scripts]
+ics-maker = "ics_maker.main:main"
+
+[tool.uv.sources]
+uvbekutils = { git = "https://github.com/kramsman/uvbekutils.git" }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
