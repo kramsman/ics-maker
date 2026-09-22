@@ -5,6 +5,8 @@
     ics-maker --template        # write a starter spreadsheet to fill in
 """
 
+# TODO: make a name a template and have program add -1, -2, etc for each
+
 from __future__ import annotations
 
 import argparse
