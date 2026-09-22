@@ -4,6 +4,7 @@ import datetime as dt
 
 import pytest
 
+from ics_maker import constants
 from ics_maker.event import (
     RowError,
     build_event,
@@ -120,10 +121,53 @@ def test_parse_reminder_rejects_an_unknown_unit():
         ("  spaced   out  ", "spaced out"),
         ("...", ""),
         ("", ""),
+        # Windows reserves these for devices, with or without an extension.
+        ("CON", "CON_"),
+        ("nul", "nul_"),
+        ("Com1", "Com1_"),
+        ("LPT9", "LPT9_"),
+        # The suffix goes on the first segment: "CON.backup_" would still
+        # be refused by Windows, because CON is still what precedes the dot.
+        ("CON.backup", "CON_.backup"),
+        ("NUL.a.b", "NUL_.a.b"),
+        ("con.ics", "con_"),  # The .ics is stripped first, leaving a bare CON.
+        # Names that merely start with a reserved word are fine as they are.
+        ("CONCERT", "CONCERT"),
+        ("CON-call", "CON-call"),
+        ("COM10", "COM10"),
+        ("AUXILIARY", "AUXILIARY"),
     ],
 )
 def test_sanitize_filename(raw, expected):
     assert sanitize_filename(raw) == expected
+
+
+def test_a_reserved_name_stays_within_the_length_limit():
+    """The suffix must never push a name past what the limit allows."""
+    for reserved in constants.WINDOWS_RESERVED_NAMES:
+        assert len(sanitize_filename(reserved)) <= constants.MAX_FILENAME_LENGTH
+
+
+def test_no_reserved_name_survives_sanitizing():
+    """Whatever comes out, Windows must be willing to create it.
+
+    Checked against the segment before the first dot, since that is the
+    part Windows actually judges -- with any extension appended.
+    """
+    for reserved in constants.WINDOWS_RESERVED_NAMES:
+        for raw in (reserved, reserved.lower(), f"{reserved}.backup", f"{reserved}.a.b"):
+            cleaned = sanitize_filename(raw)
+            head = f"{cleaned}.ics".split(".")[0]
+            assert head.upper() not in constants.WINDOWS_RESERVED_NAMES, raw
+
+
+def test_a_reserved_filename_reaches_the_written_file(tmp_path):
+    """The fix has to survive the whole path, not just the helper."""
+    spec = build_event(
+        make_row(title="Standup", start_date=dt.date(2026, 8, 31), filename="PRN"), TZ
+    )
+
+    assert spec.filename == "PRN_"
 
 
 def test_blank_filename_falls_back_to_the_row_number():

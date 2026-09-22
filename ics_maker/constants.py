@@ -177,3 +177,16 @@ REMINDER_UNITS: dict[str, int] = {
 # Characters that must never appear in an output filename.
 ILLEGAL_FILENAME_CHARS: str = '/\\:*?"<>|'
 MAX_FILENAME_LENGTH: int = 100
+
+# Names Windows reserves for hardware devices. A file called CON.ics cannot be
+# created, copied or opened there, even though macOS and iOS are perfectly
+# happy with it -- so a generated file must never be named one of these, or it
+# becomes the one file the user cannot move to a PC. Matching ignores case and
+# any extension, because Windows reserves CON.ics and con.backup.ics too.
+# sanitize_filename() appends RESERVED_NAME_SUFFIX to anything that collides.
+WINDOWS_RESERVED_NAMES: frozenset[str] = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{digit}" for digit in "123456789"}
+    | {f"LPT{digit}" for digit in "123456789"}
+)
+RESERVED_NAME_SUFFIX: str = "_"

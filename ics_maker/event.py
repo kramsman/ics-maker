@@ -113,7 +113,10 @@ def parse_reminder(value: object, row_number: int) -> dt.timedelta | None:
 
 
 def sanitize_filename(name: str) -> str:
-    """Strip characters that macOS or the shell would choke on.
+    """Strip anything macOS, Windows or the shell would choke on.
+
+    Generated files get carried between machines, so this clears the union of
+    what those platforms forbid, not just what the local one does.
 
     Args:
         name: The raw Filename cell value, with or without a .ics extension.
@@ -130,7 +133,20 @@ def sanitize_filename(name: str) -> str:
     )
     cleaned = " ".join(cleaned.split())  # Collapse runs of whitespace.
     # Leading dots hide the file in Finder; trailing dots confuse some tools.
-    return cleaned.strip(". ")[: constants.MAX_FILENAME_LENGTH].strip()
+    cleaned = cleaned.strip(". ")[: constants.MAX_FILENAME_LENGTH].strip()
+
+    # Windows reserves these for devices, and reserves them with any extension
+    # attached -- so it is the part before the first dot that has to be judged,
+    # and the part before the first dot that has to change. Appending to the
+    # end instead would leave "CON.backup_", which Windows still refuses
+    # because the segment before its first dot is still CON.
+    head, dot, rest = cleaned.partition(".")
+    if head.upper() in constants.WINDOWS_RESERVED_NAMES:
+        # Reserved names are at most 4 characters, so this can never push the
+        # result past MAX_FILENAME_LENGTH.
+        cleaned = f"{head}{constants.RESERVED_NAME_SUFFIX}{dot}{rest}"
+
+    return cleaned
 
 
 def _resolve_timezone(row: RawRow, default_tzid: str) -> str:
