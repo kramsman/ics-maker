@@ -52,6 +52,12 @@ PRODID: str = "-//ics-maker//EN"
 # directory instead of a filename (see resolve_template_path() in main.py).
 TEMPLATE_FILENAME: str = "starter.xlsx"
 
+# Where --form remembers the last event that was saved, so the next form opens
+# prefilled with it. Only the form uses this; the spreadsheet path ignores it.
+# Delete this file (or press Clear in the window) to start from a blank form.
+# A missing or unreadable file is never an error -- the form just opens blank.
+FORM_STATE_FILE = Path("~/.config/ics-maker/last-event.json").expanduser()
+
 # --- Spreadsheet schema ------------------------------------------------------
 #
 # COLUMNS defines every column ics-maker understands, and doubles as the

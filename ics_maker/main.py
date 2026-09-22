@@ -3,9 +3,11 @@
     ics-maker                   # pick a spreadsheet with the GUI file picker
     ics-maker events.xlsx       # skip the picker
     ics-maker --template        # write a starter spreadsheet to fill in
-"""
+    ics-maker --form            # fill in one event in a window instead
 
-# TODO: make a name a template and have program add -1, -2, etc for each
+The form reopens holding the last event it saved, so a near-duplicate is a
+matter of changing the title and the date.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +20,7 @@ from ics_maker import constants
 from ics_maker.event import build_events
 from ics_maker.sheet import SheetError, read_rows
 from ics_maker.template import write_template
-from ics_maker.writer import write_event
+from ics_maker.writer import unique_filename, write_event
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -68,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
             "write a starter spreadsheet and exit "
             f"(default: {constants.DEFAULT_INPUT_DIR / constants.TEMPLATE_FILENAME})"
         ),
+    )
+    parser.add_argument(
+        "--form",
+        action="store_true",
+        help="fill in one event in a window instead of reading a spreadsheet",
     )
     parser.add_argument(
         "--dry-run",
@@ -131,6 +138,63 @@ def pick_spreadsheet() -> Path | None:
         show_sortbutton=True,
     )
     return Path(chosen) if chosen else None
+
+
+def run_form(args: argparse.Namespace) -> int:
+    """Collect events from the GUI form and write one .ics file for each.
+
+    Loops until the user declines to add another, so several one-off events
+    can be entered in a single sitting without relaunching.
+
+    Args:
+        args: Parsed CLI arguments; only --output-dir and --timezone are used.
+
+    Returns:
+        A process exit code:
+            0: every event entered was written (including none, if the first
+                form was cancelled).
+            2: a bad --timezone stopped the form from opening.
+    """
+    if args.timezone not in available_timezones():
+        print(
+            f"error: {args.timezone!r} is not a known timezone name. "
+            f"Use an IANA name such as America/New_York.",
+            file=sys.stderr,
+        )
+        return 2
+
+    # Local imports: both of these pull in Qt, which turns the process into a
+    # windowed macOS app. See pick_spreadsheet() for the full reasoning.
+    from uvbekutils import confirm
+
+    from ics_maker.form import show_event_form
+
+    output_dir = args.output_dir.expanduser()
+    written = 0
+
+    while True:
+        spec = show_event_form(args.timezone)
+        if spec is None:
+            break
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        # Each form submission is a new event, and the window reopens holding
+        # the previous one's Filename -- so without this, changing only the
+        # title would silently replace the event saved a moment ago.
+        spec.filename = unique_filename(spec.filename, output_dir)
+        path = write_event(spec, output_dir)
+        written += 1
+        print(f"Wrote {path}")
+
+        if confirm(f"Wrote {path.name}.\n\nAdd another event?",
+                   "ics-maker", ["Add another", "Done"]) != "add another":
+            break
+
+    if not written:
+        print("Cancelled; nothing was written.")
+    else:
+        print(f"Wrote {written} file(s) to {output_dir}")
+    return 0
 
 
 def run(args: argparse.Namespace) -> int:
@@ -213,11 +277,11 @@ def run(args: argparse.Namespace) -> int:
 def main() -> int:
     """Parse arguments and dispatch.
 
-    Handles --template itself (writing the workbook and exiting) before
-    handing everything else off to run().
+    Handles the two modes that never read a spreadsheet -- --template and
+    --form -- before handing everything else off to run().
 
     Returns:
-        A process exit code; see run() for what each value means.
+        A process exit code; see run() and run_form() for what each means.
     """
     args = build_parser().parse_args()
 
@@ -226,6 +290,9 @@ def main() -> int:
         print(f"Wrote template to {path}")
         print("Fill it in, then run: ics-maker")
         return 0
+
+    if args.form:
+        return run_form(args)
 
     return run(args)
 

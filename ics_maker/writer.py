@@ -118,6 +118,42 @@ def build_calendar(spec: EventSpec, now: dt.datetime | None = None) -> Calendar:
     return calendar
 
 
+def unique_filename(stem: str, output_dir: Path) -> str:
+    """Find a filename stem that no file in ``output_dir`` is using yet.
+
+    Used by the --form path, where each submission is a new one-off event and
+    silently replacing the previous one would lose it. The spreadsheet path
+    deliberately does *not* use this: re-running a sheet is meant to replace
+    its own output rather than accumulate numbered copies of every row.
+
+    Note that a numbered stem also changes the event's UID (make_uid seeds on
+    the filename), which is what we want -- "book-club-1" is a second event,
+    not a correction to "book-club", and Calendar should treat it as such.
+
+    Args:
+        stem: The desired filename, without the .ics extension.
+        output_dir: Directory the file will be written into. It need not
+            exist; a missing directory simply means nothing is taken yet.
+
+    Returns:
+        ``stem`` if it is free, otherwise the first of ``stem-1``, ``stem-2``,
+        ... that is not in use.
+    """
+    if not (output_dir / f"{stem}.ics").exists():
+        return stem
+
+    counter = 1
+    while True:
+        suffix = f"-{counter}"
+        # Trim the stem rather than the suffix, so a very long title cannot
+        # push the name past the length limit sanitize_filename enforces.
+        base = stem[: constants.MAX_FILENAME_LENGTH - len(suffix)].rstrip(". ")
+        candidate = f"{base}{suffix}"
+        if not (output_dir / f"{candidate}.ics").exists():
+            return candidate
+        counter += 1
+
+
 def write_event(spec: EventSpec, output_dir: Path) -> Path:
     """Write one event to ``<output_dir>/<spec.filename>.ics``.
 

@@ -5,9 +5,10 @@ import datetime as dt
 import pytest
 from icalendar import Calendar
 
+from ics_maker import constants
 from ics_maker.event import build_event
 from ics_maker.sheet import RawRow
-from ics_maker.writer import build_calendar, make_uid, write_event
+from ics_maker.writer import build_calendar, make_uid, unique_filename, write_event
 
 TZ = "America/New_York"
 
@@ -141,3 +142,52 @@ def test_winter_event_resolves_to_standard_time(tmp_path):
     path = write_event(spec, tmp_path)
     event = next(c for c in Calendar.from_ical(path.read_bytes()).walk("VEVENT"))
     assert event["DTSTART"].dt.utcoffset() == dt.timedelta(hours=-5)
+
+
+# --- unique_filename: the --form path's collision handling -------------------
+
+
+def test_an_unused_name_is_left_alone(tmp_path):
+    assert unique_filename("book-club", tmp_path) == "book-club"
+
+
+def test_a_missing_output_dir_means_nothing_is_taken(tmp_path):
+    assert unique_filename("book-club", tmp_path / "not-created-yet") == "book-club"
+
+
+def test_a_taken_name_gets_numbered(tmp_path):
+    (tmp_path / "book-club.ics").touch()
+    assert unique_filename("book-club", tmp_path) == "book-club-1"
+
+
+def test_numbering_keeps_counting_past_the_ones_already_there(tmp_path):
+    for name in ("book-club.ics", "book-club-1.ics", "book-club-2.ics"):
+        (tmp_path / name).touch()
+    assert unique_filename("book-club", tmp_path) == "book-club-3"
+
+
+def test_only_the_ics_extension_counts_as_taken(tmp_path):
+    """A same-named .txt is not something we would overwrite."""
+    (tmp_path / "book-club.txt").touch()
+    assert unique_filename("book-club", tmp_path) == "book-club"
+
+
+def test_numbering_stays_within_the_filename_length_limit(tmp_path):
+    long_stem = "x" * constants.MAX_FILENAME_LENGTH
+    (tmp_path / f"{long_stem}.ics").touch()
+
+    numbered = unique_filename(long_stem, tmp_path)
+
+    assert numbered.endswith("-1")
+    assert len(numbered) <= constants.MAX_FILENAME_LENGTH
+
+
+def test_a_numbered_event_gets_its_own_uid(timed_spec, tmp_path):
+    """A numbered file is a second event, not a correction to the first.
+
+    If the UIDs matched, importing both would leave Calendar showing only one.
+    """
+    first = make_uid(timed_spec)
+    timed_spec.filename = "board-meeting-1"
+
+    assert make_uid(timed_spec) != first
