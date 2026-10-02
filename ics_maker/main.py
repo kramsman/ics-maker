@@ -7,6 +7,8 @@
 
 The form reopens holding the last event it saved, so a near-duplicate is a
 matter of changing the title and the date.
+
+Use makeics.command for one file standalone with form.
 """
 
 from __future__ import annotations
