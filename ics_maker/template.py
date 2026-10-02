@@ -24,6 +24,7 @@ COLUMN_WIDTHS = {
     "end_time": 11,
     "all_day": 9,
     "description": 34,
+    "attachments": 34,
     "reminder": 11,
     "timezone": 20,
     "url": 26,
@@ -51,6 +52,10 @@ def _example_rows(today: dt.date) -> list[dict[str, object]]:
             "start_time": dt.time(19, 0),
             "end_time": dt.time(20, 30),
             "description": "Quarterly review.\nBring the printed agenda.",
+            "attachments": (
+                "Agenda | https://example.com/agenda.pdf\n"
+                "Budget | https://example.com/budget.xlsx"
+            ),
             "reminder": "15m",
             "filename": "board-meeting",
         },
@@ -118,7 +123,7 @@ def write_template(path: Path) -> Path:
                 cell.number_format = DATE_FORMAT
             elif isinstance(value, dt.time):
                 cell.number_format = TIME_FORMAT
-            elif name == "description":
+            elif name in ("description", "attachments"):
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 
     # Keep the headers visible while scrolling a long list of events.

@@ -8,7 +8,13 @@ from icalendar import Calendar
 from ics_maker import constants
 from ics_maker.event import build_event
 from ics_maker.sheet import RawRow
-from ics_maker.writer import build_calendar, make_uid, unique_filename, write_event
+from ics_maker.writer import (
+    build_calendar,
+    format_description,
+    make_uid,
+    unique_filename,
+    write_event,
+)
 
 TZ = "America/New_York"
 
@@ -191,3 +197,33 @@ def test_a_numbered_event_gets_its_own_uid(timed_spec, tmp_path):
     timed_spec.filename = "board-meeting-1"
 
     assert make_uid(timed_spec) != first
+
+
+ATTACHMENTS = "Agenda | https://example.com/a.pdf\nhttps://example.com/map"
+
+
+def test_attachments_follow_the_description():
+    spec = make_spec(
+        title="Meeting",
+        start_date=dt.date(2026, 8, 31),
+        description="Quarterly review.",
+        attachments=ATTACHMENTS,
+    )
+    assert format_description(spec) == (
+        "Quarterly review.\n\n"
+        f"{constants.ATTACHMENTS_HEADING}\n"
+        "Agenda\nhttps://example.com/a.pdf\n\n"
+        "https://example.com/map"
+    )
+
+
+def test_attachments_without_a_description():
+    spec = make_spec(title="Meeting", start_date=dt.date(2026, 8, 31), attachments=ATTACHMENTS)
+    assert format_description(spec).startswith(constants.ATTACHMENTS_HEADING)
+    parsed = Calendar.from_ical(build_calendar(spec).to_ical())
+    event = next(iter(parsed.walk("VEVENT")))
+    assert str(event["DESCRIPTION"]) == format_description(spec)
+
+
+def test_no_attachments_leaves_the_description_alone(timed_spec):
+    assert format_description(timed_spec) == timed_spec.description

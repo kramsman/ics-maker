@@ -67,6 +67,31 @@ def make_uid(spec: EventSpec) -> str:
     return f"{uuid.uuid5(_UID_NAMESPACE, seed)}@ics-maker"
 
 
+def format_description(spec: EventSpec) -> str:
+    """Combine the description with a plain-text list of attachment links.
+
+    Plain text is the one form every calendar app shows: Apple Calendar,
+    every Outlook and Google all turn a bare URL in the notes into a link.
+    Each label sits on its own line above its URL, so a long share link
+    doesn't bury the name of the file.
+
+    Args:
+        spec: The event whose description and attachments to combine.
+
+    Returns:
+        The DESCRIPTION text; just ``spec.description`` when there are no
+        attachments.
+    """
+    if not spec.attachments:
+        return spec.description
+
+    entries = [f"{label}\n{url}" if label else url for label, url in spec.attachments]
+    block = constants.ATTACHMENTS_HEADING + "\n" + "\n\n".join(entries)
+    if spec.description:
+        return f"{spec.description}\n\n{block}"
+    return block
+
+
 def build_calendar(spec: EventSpec, now: dt.datetime | None = None) -> Calendar:
     """Wrap a single event in a VCALENDAR.
 
@@ -101,8 +126,9 @@ def build_calendar(spec: EventSpec, now: dt.datetime | None = None) -> Calendar:
 
     if spec.location:
         event.add("location", spec.location)
-    if spec.description:
-        event.add("description", spec.description)
+    description = format_description(spec)
+    if description:
+        event.add("description", description)
     if spec.url:
         event.add("url", spec.url)
 

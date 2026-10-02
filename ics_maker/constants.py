@@ -87,6 +87,13 @@ FORM_STATE_FILE = Path("~/.config/ics-maker/last-event.json").expanduser()
 #   Description  Optional. Free text; becomes the event's Notes field in
 #                Calendar (not shown on the calendar grid -- open the event
 #                to see it). Line breaks are preserved.
+#   Attachments  Optional. Links to files, one per line (Alt+Enter in Excel,
+#                Option+Return in Numbers, for a new line inside a cell).
+#                Each line is an optional label followed by the http(s) URL,
+#                e.g. "Agenda | https://..." or just "https://...". They are
+#                listed at the end of the event's Notes under
+#                ATTACHMENTS_HEADING, label above URL, which every calendar
+#                app shows as clickable links.
 #   Reminder     Optional. How long before the start to pop an alert, e.g.
 #                15m, 1h, 2 hours, 1d, 1w, or a bare number of minutes.
 #                See NO_REMINDER_VALUES and REMINDER_UNITS below for exactly
@@ -113,6 +120,7 @@ COLUMNS: dict[str, str] = {
     "end_time": "End Time",
     "all_day": "All Day",
     "description": "Description",
+    "attachments": "Attachments",
     "reminder": "Reminder",
     "timezone": "Timezone",
     "url": "URL",
@@ -122,6 +130,9 @@ COLUMNS: dict[str, str] = {
 # Canonical field names (keys of COLUMNS) that read_rows() will refuse
 # to proceed without.
 REQUIRED_COLUMNS: tuple[str, ...] = ("title", "start_date")
+
+# Heading written above the attachment links appended to an event's Notes.
+ATTACHMENTS_HEADING: str = "Attachments:"
 
 # --- Value parsing ------------------------------------------------------------
 #

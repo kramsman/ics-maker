@@ -275,3 +275,17 @@ def test_a_bad_timezone_stops_before_the_window_opens(tmp_path):
 
     assert main.run_form(args) == 2
     assert list(tmp_path.glob("*.ics")) == []
+
+
+def test_attachments_round_trip_through_saved_state(tmp_path):
+    state = tmp_path / "last-event.json"
+    links = "Agenda | https://example.com/a.pdf\nhttps://example.com/map"
+    save_form_values(collected(attachments=links), state)
+
+    restored = load_form_values(state)
+    assert restored["attachments"] == links
+    spec = build_event(form_values_to_row(restored), constants.DEFAULT_TIMEZONE)
+    assert spec.attachments == [
+        ("Agenda", "https://example.com/a.pdf"),
+        ("", "https://example.com/map"),
+    ]

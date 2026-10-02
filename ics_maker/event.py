@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 from zoneinfo import ZoneInfo, available_timezones
 
@@ -42,6 +42,7 @@ class EventSpec:
         end: Exclusive end. For all-day events this is the day *after* the
             last day the event covers, per RFC 5545.
         reminder: How long before the start to fire an alarm, or None.
+        attachments: (label, url) pairs for linked files; label may be "".
         filename: Output stem, without the .ics extension.
         row_number: Source row, used in error and summary messages.
     """
@@ -57,6 +58,7 @@ class EventSpec:
     description: str = ""
     url: str = ""
     reminder: dt.timedelta | None = None
+    attachments: list[tuple[str, str]] = field(default_factory=list)
 
 
 @cache
@@ -110,6 +112,42 @@ def parse_reminder(value: object, row_number: int) -> dt.timedelta | None:
             f"{clean_str(value)!r}. Use m, h, d or w.",
         )
     return dt.timedelta(minutes=float(amount) * minutes_per_unit)
+
+
+def parse_attachments(value: object, row_number: int) -> list[tuple[str, str]]:
+    """Parse an Attachments cell into (label, url) pairs.
+
+    Each non-blank line is an optional label followed by an http(s) URL, e.g.
+    "Agenda | https://...", "Budget: https://..." or a bare "https://...".
+    The URL is the line's last whitespace-separated word; whatever comes
+    before it is the label, minus any trailing "|", ":", "-" or "–".
+
+    Args:
+        value: The raw Attachments cell value.
+        row_number: 1-based sheet row, used to attribute a raised RowError.
+
+    Returns:
+        The links in the order given; empty when the cell is blank. A link
+        with no label has "" as its label.
+
+    Raises:
+        RowError: A line does not end in an http:// or https:// URL.
+    """
+    attachments: list[tuple[str, str]] = []
+    for line in clean_str(value).splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        *rest, url = line.rsplit(maxsplit=1)
+        label = rest[0] if rest else ""
+        if not url.lower().startswith(("http://", "https://")):
+            raise RowError(
+                row_number,
+                f"{constants.COLUMNS['attachments']!r} line {line!r} does not end "
+                f"in a link starting with http:// or https://.",
+            )
+        attachments.append((label.strip().rstrip("|:-–").strip(), url))
+    return attachments
 
 
 def sanitize_filename(name: str) -> str:
@@ -207,6 +245,7 @@ def build_event(row: RawRow, default_tzid: str) -> EventSpec:
 
     tzid = _resolve_timezone(row, default_tzid)
     reminder = parse_reminder(row.raw("reminder"), number)
+    attachments = parse_attachments(row.raw("attachments"), number)
 
     # No start time is as good a signal as the checkbox that this is all-day.
     all_day = marked_all_day or start_time is None
@@ -255,6 +294,7 @@ def build_event(row: RawRow, default_tzid: str) -> EventSpec:
         description=row.text("description"),
         url=row.text("url"),
         reminder=reminder,
+        attachments=attachments,
     )
 
 

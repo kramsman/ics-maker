@@ -114,6 +114,10 @@ class EventFormDialog(QDialog):
         self.description = QPlainTextEdit()
         self.description.setFixedHeight(80)
 
+        self.attachments = QPlainTextEdit()
+        self.attachments.setFixedHeight(60)
+        self.attachments.setPlaceholderText("Agenda | https://...  (one link per line)")
+
         self.reminder = QComboBox()
         self.reminder.setEditable(True)
         self.reminder.addItems(REMINDER_CHOICES)
@@ -154,6 +158,7 @@ class EventFormDialog(QDialog):
         form.addRow(constants.COLUMNS["reminder"], self.reminder)
         form.addRow(constants.COLUMNS["timezone"], self.timezone)
         form.addRow(constants.COLUMNS["description"], self.description)
+        form.addRow(constants.COLUMNS["attachments"], self.attachments)
         form.addRow(constants.COLUMNS["url"], self.url)
         form.addRow(constants.COLUMNS["filename"], self.filename)
 
@@ -193,6 +198,7 @@ class EventFormDialog(QDialog):
             self.title.setText(_as_text(values.get("title")))
             self.location.setText(_as_text(values.get("location")))
             self.description.setPlainText(_as_text(values.get("description")))
+            self.attachments.setPlainText(_as_text(values.get("attachments")))
             self.url.setText(_as_text(values.get("url")))
             self.filename.setText(_as_text(values.get("filename")))
 
@@ -307,6 +313,7 @@ class EventFormDialog(QDialog):
             "end_time": None if all_day else self.end_time.time().toPython(),
             "all_day": all_day,
             "description": self.description.toPlainText(),
+            "attachments": self.attachments.toPlainText(),
             "reminder": self.reminder.currentText(),
             "timezone": self.timezone.currentText(),
             "url": self.url.text(),

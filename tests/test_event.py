@@ -9,6 +9,7 @@ from ics_maker.event import (
     RowError,
     build_event,
     build_events,
+    parse_attachments,
     parse_reminder,
     sanitize_filename,
 )
@@ -233,3 +234,50 @@ def test_duplicate_filenames_are_rejected_rather_than_overwriting():
     events, errors = build_events(rows, TZ)
     assert len(events) == 1
     assert "already used by row 2" in errors[0].message
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Agenda | https://example.com/a.pdf",
+        "Agenda: https://example.com/a.pdf",
+        "Agenda - https://example.com/a.pdf",
+        "Agenda – https://example.com/a.pdf",
+        "Agenda https://example.com/a.pdf",
+        "  Agenda\t|\thttps://example.com/a.pdf  ",
+    ],
+)
+def test_attachment_label_separators(line):
+    assert parse_attachments(line, 2) == [("Agenda", "https://example.com/a.pdf")]
+
+
+def test_attachments_bare_urls_and_blank_lines():
+    value = "\nhttps://example.com/map\n\nBudget Q3 | http://example.com/b.xlsx\n"
+    assert parse_attachments(value, 2) == [
+        ("", "https://example.com/map"),
+        ("Budget Q3", "http://example.com/b.xlsx"),
+    ]
+
+
+def test_blank_attachments_are_empty():
+    assert parse_attachments(None, 2) == []
+    assert parse_attachments("   ", 2) == []
+
+
+def test_attachment_without_a_url_is_rejected():
+    with pytest.raises(RowError) as excinfo:
+        parse_attachments("Agenda | example.com/a.pdf", 5)
+    assert excinfo.value.row_number == 5
+    assert constants.COLUMNS["attachments"] in excinfo.value.message
+
+
+def test_build_event_carries_attachments():
+    spec = build_event(
+        make_row(
+            title="Meeting",
+            start_date=dt.date(2026, 8, 31),
+            attachments="Agenda | https://example.com/a.pdf",
+        ),
+        TZ,
+    )
+    assert spec.attachments == [("Agenda", "https://example.com/a.pdf")]
